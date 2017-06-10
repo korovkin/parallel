@@ -14,8 +14,10 @@ exception ExecuteException {
 }
 
 service Parallel {
+   // round trip
    string Ping();
 
+   // execute a shell command:
    string Execute(1:Cmd command) 
         throws (1:ExecuteException e);
 }

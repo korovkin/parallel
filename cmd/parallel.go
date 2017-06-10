@@ -75,13 +75,22 @@ func newLogger(ticket int) *logger {
 	return l
 }
 
-func executeCommand(ticket int, cmdLine string) bool {
+func executeCommand(p *Parallel, ticket int, cmdLine string) bool {
 	T_START := time.Now()
 	logger := newLogger(ticket)
 
 	defer func() {
 		fmt.Fprintf(logger, "done: dt: "+time.Since(T_START).String()+"\n")
 	}()
+
+	output, err := p.client.Execute(&parallel.Cmd{
+		CmdLine: cmdLine,
+		Ticket:  int64(ticket),
+	})
+	if err != nil {
+		log.Fatalln("failed to execute:", err.Error())
+	}
+	fmt.Fprintf(logger, "execute: output: '"+output+"'\n")
 
 	cs := []string{"/bin/sh", "-c", cmdLine}
 	cmd := exec.Command(cs[0], cs[1:]...)
@@ -95,13 +104,14 @@ func executeCommand(ticket int, cmdLine string) bool {
 
 	fmt.Fprintf(logger, "run: '"+cmdLine+"'\n")
 
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		log.Fatalln("failed to start:", err)
 		return true
 	}
 
 	err = cmd.Wait()
+
 	return true
 }
 
@@ -110,40 +120,46 @@ type Parallel struct {
 	logger  *logger
 	worker  *limiter.ConcurrencyLimiter
 	address string
+
+	// master / slave
+	protocolFactory  thrift.TProtocolFactory
+	transportFactory thrift.TTransportFactory
+
+	// master:
+	transport thrift.TTransport
+	client    *parallel.ParallelClient
+
+	// slave:
+	handler *ParallelSlaveHandler
+}
+
+func (p *Parallel) Close() {
+	if p.transport != nil {
+		p.transport.Close()
+	}
 }
 
 func mainMaster(p *Parallel) {
-	{
-		var transport thrift.TTransport
-		var err error
-		transport, err = thrift.NewTSocket(p.address)
+	var err error
+	p.transport, err = thrift.NewTSocket(p.address)
 
-		if transport == nil {
-			log.Fatalln("failed allocate transport:")
-		}
-
-		if err != nil {
-			log.Fatalln("failed to dial slave:", err.Error())
-		}
-
-		var transportFactory thrift.TTransportFactory
-		transportFactory = thrift.NewTTransportFactory()
-		transportFactory = thrift.NewTFramedTransportFactory(transportFactory)
-
-		transport = transportFactory.GetTransport(transport)
-		defer transport.Close()
-
-		err = transport.Open()
-		if err != nil {
-			log.Fatalln("failed to open:", err.Error())
-		}
-
-		var protocolFactory thrift.TProtocolFactory
-		protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
-
-		client := parallel.NewParallelClientFactory(transport, protocolFactory)
-		client.Ping()
+	if p.transport == nil {
+		log.Fatalln("failed allocate transport")
 	}
+
+	if err != nil {
+		log.Fatalln("failed to dial slave:", err.Error())
+	}
+
+	p.transport = p.transportFactory.GetTransport(p.transport)
+
+	err = p.transport.Open()
+	if err != nil {
+		log.Fatalln("failed to open:", err.Error())
+	}
+
+	p.client = parallel.NewParallelClientFactory(p.transport, p.protocolFactory)
+	p.client.Ping()
 
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
 	fmt.Fprintf(p.logger, "reading from stdin...\n")
@@ -155,7 +171,7 @@ func mainMaster(p *Parallel) {
 		line = strings.TrimSpace(line)
 
 		p.worker.ExecuteWithTicket(func(ticket int) {
-			executeCommand(ticket, line)
+			executeCommand(p, ticket, line)
 		})
 	}
 }
@@ -195,10 +211,10 @@ func mainSlave(p *Parallel) {
 		return
 	}
 
-	handler := NewParallelSlaveHandler()
-	processor := parallel.NewParallelProcessor(handler)
+	p.handler = NewParallelSlaveHandler()
+
 	server := thrift.NewTSimpleServer4(
-		processor,
+		parallel.NewParallelProcessor(p.handler),
 		transport,
 		transportFactory,
 		protocolFactory)
@@ -234,6 +250,13 @@ func main() {
 	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
 	p.address = "localhost:9010"
 
+	// thrift protocol
+	p.protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
+
+	// thrift transport
+	p.transportFactory = thrift.NewTTransportFactory()
+	p.transportFactory = thrift.NewTFramedTransportFactory(p.transportFactory)
+
 	if *flag_slave == false {
 		fmt.Fprintf(logger, fmt.Sprintf("running as master\n"))
 		mainMaster(&p)
@@ -243,4 +266,5 @@ func main() {
 	}
 
 	p.worker.Wait()
+	p.Close()
 }
