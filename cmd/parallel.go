@@ -83,14 +83,17 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) bool {
 		fmt.Fprintf(logger, "done: dt: "+time.Since(T_START).String()+"\n")
 	}()
 
-	output, err := p.client.Execute(&parallel.Cmd{
-		CmdLine: cmdLine,
-		Ticket:  int64(ticket),
-	})
-	if err != nil {
-		log.Fatalln("failed to execute:", err.Error())
+	if len(p.Slaves) > 0 {
+		slave := p.Slaves[ticket%len(p.Slaves)]
+		output, err := slave.Client.Execute(&parallel.Cmd{
+			CmdLine: cmdLine,
+			Ticket:  int64(ticket),
+		})
+		if err != nil {
+			log.Fatalln("failed to execute:", err.Error())
+		}
+		fmt.Fprintf(logger, "execute: output: '"+output+"'\n")
 	}
-	fmt.Fprintf(logger, "execute: output: '"+output+"'\n")
 
 	cs := []string{"/bin/sh", "-c", cmdLine}
 	cmd := exec.Command(cs[0], cs[1:]...)
@@ -104,7 +107,7 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) bool {
 
 	fmt.Fprintf(logger, "run: '"+cmdLine+"'\n")
 
-	err = cmd.Start()
+	err := cmd.Start()
 	if err != nil {
 		log.Fatalln("failed to start:", err)
 		return true
@@ -115,11 +118,15 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) bool {
 	return true
 }
 
+type Slave struct {
+	Address string `json:"address"`
+	Client  *parallel.ParallelClient
+}
+
 type Parallel struct {
-	jobs    int
-	logger  *logger
-	worker  *limiter.ConcurrencyLimiter
-	address string
+	jobs   int
+	logger *logger
+	worker *limiter.ConcurrencyLimiter
 
 	// master / slave
 	protocolFactory  thrift.TProtocolFactory
@@ -127,11 +134,12 @@ type Parallel struct {
 
 	// master:
 	transport thrift.TTransport
-	client    *parallel.ParallelClient
+	Slaves    []*Slave
 
 	// slave:
 	handler         *ParallelSlaveHandler
 	serverTransport thrift.TServerTransport
+	address         string
 }
 
 func (p *Parallel) Close() {
@@ -143,25 +151,31 @@ func (p *Parallel) Close() {
 
 func mainMaster(p *Parallel) {
 	var err error
-	p.transport, err = thrift.NewTSocket(p.address)
 
-	if p.transport == nil {
-		log.Fatalln("failed allocate transport")
+	// connect to slaves:
+	for _, slave := range p.Slaves {
+		p.transport, err = thrift.NewTSocket(slave.Address)
+
+		if p.transport == nil {
+			log.Fatalln("failed allocate transport")
+		}
+
+		if err != nil {
+			log.Fatalln("failed to dial slave:", err.Error())
+		}
+
+		p.transport = p.transportFactory.GetTransport(p.transport)
+
+		err = p.transport.Open()
+		if err != nil {
+			log.Fatalln("failed to open:", err.Error())
+		}
+
+		slave.Client = parallel.NewParallelClientFactory(p.transport, p.protocolFactory)
+		slave.Client.Ping()
+
+		fmt.Fprintf(p.logger, fmt.Sprintf("adding slave: %s", slave.Address))
 	}
-
-	if err != nil {
-		log.Fatalln("failed to dial slave:", err.Error())
-	}
-
-	p.transport = p.transportFactory.GetTransport(p.transport)
-
-	err = p.transport.Open()
-	if err != nil {
-		log.Fatalln("failed to open:", err.Error())
-	}
-
-	p.client = parallel.NewParallelClientFactory(p.transport, p.protocolFactory)
-	p.client.Ping()
 
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
 	fmt.Fprintf(p.logger, "reading from stdin...\n")
@@ -230,20 +244,37 @@ func main() {
 		"j",
 		2,
 		"num of concurrent jobs")
+
 	flag_slave := flag.Bool(
 		"slave",
 		false,
 		"run as slave")
 
+	slaves := flag.String(
+		"slaves",
+		"",
+		"CSV list of slave addresses")
+
+	address := flag.String(
+		"address",
+		"localhost:9010",
+		"slave address")
+
 	flag.Parse()
 	fmt.Fprintf(logger, fmt.Sprintf("concurrency limit: %d", *flag_jobs))
+	fmt.Fprintf(logger, fmt.Sprintf("slaves: %s", *slaves))
 
 	p := Parallel{}
 	p.jobs = *flag_jobs
 	p.logger = logger
 	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
-	p.address = "localhost:9010"
+	p.address = *address
 	defer p.Close()
+
+	for _, slaveAddr := range strings.Split(*slaves, ",") {
+		slave := Slave{Address: slaveAddr}
+		p.Slaves = append(p.Slaves, &slave)
+	}
 
 	// thrift protocol
 	p.protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
@@ -256,7 +287,7 @@ func main() {
 		fmt.Fprintf(logger, fmt.Sprintf("running as master\n"))
 		mainMaster(&p)
 	} else {
-		fmt.Fprintf(logger, fmt.Sprintf("running as slave\n"))
+		fmt.Fprintf(logger, fmt.Sprintf("running as slave on: %s\n", p.address))
 		mainSlave(&p)
 	}
 }
