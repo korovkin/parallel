@@ -108,7 +108,7 @@ func main() {
 	T_START := time.Now()
 	logger := newLogger(0)
 	defer func() {
-		fmt.Fprintf(logger, "ALL DONE: dt: "+time.Since(T_START).String()+"\n")
+		fmt.Fprintf(logger, "all done: dt: "+time.Since(T_START).String()+"\n")
 	}()
 
 	flag_jobs := flag.Int(
