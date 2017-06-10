@@ -20,8 +20,9 @@ import (
 )
 
 type logger struct {
-	ticket int
-	buf    *bytes.Buffer
+	ticket   int
+	hostname string
+	buf      *bytes.Buffer
 }
 
 var (
@@ -52,7 +53,7 @@ func (l *logger) Write(p []byte) (int, error) {
 
 			loggerMutex.Lock()
 			ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-			fmt.Printf("[%16s %s %s %d] ", ts, loggerHostname, now, l.ticket)
+			fmt.Printf("[%16s %s %s %d] ", ts, l.hostname, now, l.ticket)
 			ct.ResetColor()
 
 			if l.buf != nil {
@@ -126,9 +127,11 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		}
 
 		hostname := output.Tags["hostname"]
+		loggerOut.hostname = hostname
+		loggerErr.hostname = hostname
 
-		fmt.Fprintf(loggerOut, "execute: remotely: host: %s stdout: '%s'\n", hostname, output.Stdout)
-		fmt.Fprintf(loggerErr, "execute: remotely: host: %s stderr: '%s'\n", hostname, output.Stderr)
+		fmt.Fprintf(loggerOut, "execute: remotely: host: %s stdout: [%s]\n", hostname, output.Stdout)
+		fmt.Fprintf(loggerErr, "execute: remotely: host: %s stderr: [%s]\n", hostname, output.Stderr)
 
 		return output, err
 	}
@@ -341,9 +344,15 @@ func main() {
 	p.transportFactory = thrift.NewTFramedTransportFactory(p.transportFactory)
 
 	if *flag_slave == false {
+		loggerHostname = p.address
+		logger.hostname = loggerHostname
+
 		fmt.Fprintf(logger, fmt.Sprintf("running as master\n"))
 		mainMaster(&p)
 	} else {
+		loggerHostname = p.address
+		logger.hostname = loggerHostname
+
 		fmt.Fprintf(logger, fmt.Sprintf("running as slave on: %s\n", p.address))
 		mainSlave(&p)
 	}
