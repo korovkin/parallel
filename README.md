@@ -6,7 +6,7 @@ where `xargs` meets `foreman` or `goreman` for controlled, concurrent execution 
 
 executing the following will install the tool into: `$GOPATH/bin/parallel`
 ```
-    go get github.com:korovkin/parallel.git/...
+go get github.com:korovkin/parallel.git/...
 ```
 
 ## compress/decompress 10 large files serial:
