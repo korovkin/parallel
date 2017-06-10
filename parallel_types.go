@@ -187,9 +187,11 @@ func (p *Cmd) String() string {
 // Attributes:
 //  - Stdout
 //  - Stderr
+//  - Tags
 type Output struct {
-	Stdout string `thrift:"stdout,1" json:"stdout"`
-	Stderr string `thrift:"stderr,2" json:"stderr"`
+	Stdout string            `thrift:"stdout,1" json:"stdout"`
+	Stderr string            `thrift:"stderr,2" json:"stderr"`
+	Tags   map[string]string `thrift:"tags,3" json:"tags"`
 }
 
 func NewOutput() *Output {
@@ -202,6 +204,10 @@ func (p *Output) GetStdout() string {
 
 func (p *Output) GetStderr() string {
 	return p.Stderr
+}
+
+func (p *Output) GetTags() map[string]string {
+	return p.Tags
 }
 func (p *Output) Read(iprot thrift.TProtocol) error {
 	if _, err := iprot.ReadStructBegin(); err != nil {
@@ -223,6 +229,10 @@ func (p *Output) Read(iprot thrift.TProtocol) error {
 			}
 		case 2:
 			if err := p.readField2(iprot); err != nil {
+				return err
+			}
+		case 3:
+			if err := p.readField3(iprot); err != nil {
 				return err
 			}
 		default:
@@ -258,6 +268,34 @@ func (p *Output) readField2(iprot thrift.TProtocol) error {
 	return nil
 }
 
+func (p *Output) readField3(iprot thrift.TProtocol) error {
+	_, _, size, err := iprot.ReadMapBegin()
+	if err != nil {
+		return thrift.PrependError("error reading map begin: ", err)
+	}
+	tMap := make(map[string]string, size)
+	p.Tags = tMap
+	for i := 0; i < size; i++ {
+		var _key0 string
+		if v, err := iprot.ReadString(); err != nil {
+			return thrift.PrependError("error reading field 0: ", err)
+		} else {
+			_key0 = v
+		}
+		var _val1 string
+		if v, err := iprot.ReadString(); err != nil {
+			return thrift.PrependError("error reading field 0: ", err)
+		} else {
+			_val1 = v
+		}
+		p.Tags[_key0] = _val1
+	}
+	if err := iprot.ReadMapEnd(); err != nil {
+		return thrift.PrependError("error reading map end: ", err)
+	}
+	return nil
+}
+
 func (p *Output) Write(oprot thrift.TProtocol) error {
 	if err := oprot.WriteStructBegin("Output"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
@@ -266,6 +304,9 @@ func (p *Output) Write(oprot thrift.TProtocol) error {
 		return err
 	}
 	if err := p.writeField2(oprot); err != nil {
+		return err
+	}
+	if err := p.writeField3(oprot); err != nil {
 		return err
 	}
 	if err := oprot.WriteFieldStop(); err != nil {
@@ -299,6 +340,30 @@ func (p *Output) writeField2(oprot thrift.TProtocol) (err error) {
 	}
 	if err := oprot.WriteFieldEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write field end error 2:stderr: ", p), err)
+	}
+	return err
+}
+
+func (p *Output) writeField3(oprot thrift.TProtocol) (err error) {
+	if err := oprot.WriteFieldBegin("tags", thrift.MAP, 3); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T write field begin error 3:tags: ", p), err)
+	}
+	if err := oprot.WriteMapBegin(thrift.STRING, thrift.STRING, len(p.Tags)); err != nil {
+		return thrift.PrependError("error writing map begin: ", err)
+	}
+	for k, v := range p.Tags {
+		if err := oprot.WriteString(string(k)); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T. (0) field write error: ", p), err)
+		}
+		if err := oprot.WriteString(string(v)); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T. (0) field write error: ", p), err)
+		}
+	}
+	if err := oprot.WriteMapEnd(); err != nil {
+		return thrift.PrependError("error writing map end: ", err)
+	}
+	if err := oprot.WriteFieldEnd(); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T write field end error 3:tags: ", p), err)
 	}
 	return err
 }

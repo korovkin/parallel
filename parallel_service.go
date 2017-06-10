@@ -93,16 +93,16 @@ func (p *ParallelClient) recvPing() (value string, err error) {
 		return
 	}
 	if mTypeId == thrift.EXCEPTION {
-		error0 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
-		var error1 error
-		error1, err = error0.Read(iprot)
+		error2 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
+		var error3 error
+		error3, err = error2.Read(iprot)
 		if err != nil {
 			return
 		}
 		if err = iprot.ReadMessageEnd(); err != nil {
 			return
 		}
-		err = error1
+		err = error3
 		return
 	}
 	if mTypeId != thrift.REPLY {
@@ -170,16 +170,16 @@ func (p *ParallelClient) recvExecute() (value *Output, err error) {
 		return
 	}
 	if mTypeId == thrift.EXCEPTION {
-		error2 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
-		var error3 error
-		error3, err = error2.Read(iprot)
+		error4 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
+		var error5 error
+		error5, err = error4.Read(iprot)
 		if err != nil {
 			return
 		}
 		if err = iprot.ReadMessageEnd(); err != nil {
 			return
 		}
-		err = error3
+		err = error5
 		return
 	}
 	if mTypeId != thrift.REPLY {
@@ -221,10 +221,10 @@ func (p *ParallelProcessor) ProcessorMap() map[string]thrift.TProcessorFunction 
 
 func NewParallelProcessor(handler Parallel) *ParallelProcessor {
 
-	self4 := &ParallelProcessor{handler: handler, processorMap: make(map[string]thrift.TProcessorFunction)}
-	self4.processorMap["Ping"] = &parallelProcessorPing{handler: handler}
-	self4.processorMap["Execute"] = &parallelProcessorExecute{handler: handler}
-	return self4
+	self6 := &ParallelProcessor{handler: handler, processorMap: make(map[string]thrift.TProcessorFunction)}
+	self6.processorMap["Ping"] = &parallelProcessorPing{handler: handler}
+	self6.processorMap["Execute"] = &parallelProcessorExecute{handler: handler}
+	return self6
 }
 
 func (p *ParallelProcessor) Process(iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
@@ -237,12 +237,12 @@ func (p *ParallelProcessor) Process(iprot, oprot thrift.TProtocol) (success bool
 	}
 	iprot.Skip(thrift.STRUCT)
 	iprot.ReadMessageEnd()
-	x5 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function "+name)
+	x7 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function "+name)
 	oprot.WriteMessageBegin(name, thrift.EXCEPTION, seqId)
-	x5.Write(oprot)
+	x7.Write(oprot)
 	oprot.WriteMessageEnd()
 	oprot.Flush()
-	return false, x5
+	return false, x7
 
 }
 

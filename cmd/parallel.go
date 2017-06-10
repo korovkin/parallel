@@ -28,6 +28,7 @@ var (
 	loggerMutex     = new(sync.Mutex)
 	loggerIndex     = int(0)
 	loggerStartTime = time.Now()
+	loggerHostname  = ""
 )
 
 var loggerColors = []ct.Color{
@@ -51,7 +52,7 @@ func (l *logger) Write(p []byte) (int, error) {
 
 			loggerMutex.Lock()
 			ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-			fmt.Printf("[%14s %s %d] ", ts, now, l.ticket)
+			fmt.Printf("[%20s %s %d] ", ts, now, l.ticket)
 			ct.ResetColor()
 
 			if l.buf != nil {
@@ -123,8 +124,12 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		if err != nil {
 			log.Fatalln("failed to execute:", err.Error())
 		}
-		fmt.Fprintf(loggerOut, "execute: remotely: stdout: '"+output.Stdout+"'\n")
-		fmt.Fprintf(loggerErr, "execute: remotely: stderr: '"+output.Stderr+"'\n")
+
+		hostname := output.Tags["hostname"]
+
+		fmt.Fprintf(loggerOut, "execute: remotely: host: %s stdout: '%s'\n", hostname, output.Stdout)
+		fmt.Fprintf(loggerErr, "execute: remotely: host: %s stderr: '%s'\n", hostname, output.Stderr)
+
 		return output, err
 	}
 
@@ -151,6 +156,7 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		err = cmd.Wait()
 	}
 
+	output.Tags = map[string]string{"hostname": loggerHostname}
 	output.Stdout = string(loggerOut.buf.Bytes())
 	output.Stderr = string(loggerErr.buf.Bytes())
 
@@ -302,6 +308,8 @@ func main() {
 	flag.Parse()
 	fmt.Fprintf(logger, fmt.Sprintf("concurrency limit: %d", *flag_jobs))
 	fmt.Fprintf(logger, fmt.Sprintf("slaves: %s", *slaves))
+
+	loggerHostname, _ = os.Hostname()
 
 	p := Parallel{}
 	p.jobs = *flag_jobs
