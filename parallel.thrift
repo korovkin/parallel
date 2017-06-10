@@ -25,6 +25,6 @@ service Parallel {
    string Ping();
 
    // execute a shell command:
-    Output Execute(1:Cmd command) 
+   Output Execute(1:Cmd command) 
             throws (1:ExecuteException e);
 }
