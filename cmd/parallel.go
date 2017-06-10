@@ -52,7 +52,7 @@ func (l *logger) Write(p []byte) (int, error) {
 
 			loggerMutex.Lock()
 			ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-			fmt.Printf("[%20s %s %d] ", ts, now, l.ticket)
+			fmt.Printf("[%16s %s %s %d] ", ts, loggerHostname, now, l.ticket)
 			ct.ResetColor()
 
 			if l.buf != nil {
@@ -157,8 +157,14 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	}
 
 	output.Tags = map[string]string{"hostname": loggerHostname}
-	output.Stdout = string(loggerOut.buf.Bytes())
-	output.Stderr = string(loggerErr.buf.Bytes())
+
+	if loggerOut.buf != nil {
+		output.Stdout = string(loggerOut.buf.Bytes())
+	}
+
+	if loggerErr.buf != nil {
+		output.Stderr = string(loggerErr.buf.Bytes())
+	}
 
 	return output, err
 }
@@ -305,11 +311,11 @@ func main() {
 		"localhost:9010",
 		"slave address")
 
+	loggerHostname, _ = os.Hostname()
+
 	flag.Parse()
 	fmt.Fprintf(logger, fmt.Sprintf("concurrency limit: %d", *flag_jobs))
 	fmt.Fprintf(logger, fmt.Sprintf("slaves: %s", *slaves))
-
-	loggerHostname, _ = os.Hostname()
 
 	p := Parallel{}
 	p.jobs = *flag_jobs
