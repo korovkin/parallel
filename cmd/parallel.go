@@ -123,7 +123,6 @@ func mainMaster(p *Parallel) {
 			executeCommand(ticket, line)
 		})
 	}
-	p.worker.Wait()
 }
 
 func main() {
@@ -149,12 +148,15 @@ func main() {
 	flag.Parse()
 	fmt.Fprintf(logger, fmt.Sprintf("concurrency limit: %d", *flag_jobs))
 
+	p := Parallel{}
+	p.jobs = *flag_jobs
+	p.logger = logger
+	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
+
 	if *flag_master {
-		p := Parallel{}
-		p.jobs = *flag_jobs
-		p.logger = logger
-		p.worker = limiter.NewConcurrencyLimiter(p.jobs)
 		mainMaster(&p)
 	} else if *flag_slave {
 	}
+
+	p.worker.Wait()
 }
