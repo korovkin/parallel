@@ -100,7 +100,6 @@ func executeCommand(ticket int, cmdLine string) bool {
 	}
 
 	err = cmd.Wait()
-
 	return true
 }
 
@@ -117,21 +116,18 @@ func main() {
 		"num of concurrent jobs")
 
 	flag.Parse()
-	log.Println("concurrent job:", *flag_jobs)
+	fmt.Fprintf(logger, fmt.Sprintf("concurrency limit: %d", *flag_jobs))
 	worker := limiter.NewConcurrencyLimiter(*flag_jobs)
 
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
-	log.Println("reading from stdin...")
+	fmt.Fprintf(logger, "reading from stdin...\n")
 
 	for {
 		line, err := r.ReadString('\n')
-
 		if err == io.EOF {
 			break
 		}
-
 		line = strings.TrimSpace(line)
-
 		worker.ExecuteWithTicket(func(ticket int) {
 			executeCommand(ticket, line)
 		})
