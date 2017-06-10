@@ -130,7 +130,8 @@ type Parallel struct {
 	client    *parallel.ParallelClient
 
 	// slave:
-	handler *ParallelSlaveHandler
+	handler         *ParallelSlaveHandler
+	serverTransport thrift.TServerTransport
 }
 
 func (p *Parallel) Close() {
@@ -197,15 +198,7 @@ func (p *ParallelSlaveHandler) Ping() (r string, err error) {
 func mainSlave(p *Parallel) {
 	var err error
 
-	var protocolFactory thrift.TProtocolFactory
-	protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
-
-	var transportFactory thrift.TTransportFactory
-	transportFactory = thrift.NewTTransportFactory()
-	transportFactory = thrift.NewTFramedTransportFactory(transportFactory)
-
-	var transport thrift.TServerTransport
-	transport, err = thrift.NewTServerSocket(p.address)
+	p.serverTransport, err = thrift.NewTServerSocket(p.address)
 
 	if err != nil {
 		log.Fatalln("failed to start server:", err.Error())
@@ -216,9 +209,9 @@ func mainSlave(p *Parallel) {
 
 	server := thrift.NewTSimpleServer4(
 		parallel.NewParallelProcessor(p.handler),
-		transport,
-		transportFactory,
-		protocolFactory)
+		p.serverTransport,
+		p.transportFactory,
+		p.protocolFactory)
 
 	err = server.Serve()
 	if err != nil {
