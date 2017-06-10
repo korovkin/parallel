@@ -14,5 +14,8 @@ exception ExecuteException {
 }
 
 service Parallel {
-   string Execute(1:Cmd command) throws (1:ExecuteException e),
+   string Ping();
+
+   string Execute(1:Cmd command) 
+        throws (1:ExecuteException e);
 }

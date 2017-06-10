@@ -113,6 +113,38 @@ type Parallel struct {
 }
 
 func mainMaster(p *Parallel) {
+	{
+		var transport thrift.TTransport
+		var err error
+		transport, err = thrift.NewTSocket(p.address)
+
+		if transport == nil {
+			log.Fatalln("failed allocate transport:")
+		}
+
+		if err != nil {
+			log.Fatalln("failed to dial slave:", err.Error())
+		}
+
+		var transportFactory thrift.TTransportFactory
+		transportFactory = thrift.NewTTransportFactory()
+		transportFactory = thrift.NewTFramedTransportFactory(transportFactory)
+
+		transport = transportFactory.GetTransport(transport)
+		defer transport.Close()
+
+		err = transport.Open()
+		if err != nil {
+			log.Fatalln("failed to open:", err.Error())
+		}
+
+		var protocolFactory thrift.TProtocolFactory
+		protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
+
+		client := parallel.NewParallelClientFactory(transport, protocolFactory)
+		client.Ping()
+	}
+
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
 	fmt.Fprintf(p.logger, "reading from stdin...\n")
 	for {
@@ -140,24 +172,19 @@ func (p *ParallelSlaveHandler) Execute(command *parallel.Cmd) (r string, err err
 	return "ok", nil
 }
 
+func (p *ParallelSlaveHandler) Ping() (r string, err error) {
+	log.Println("ParallelSlaveHandler: Ping")
+	return "ok", nil
+}
+
 func mainSlave(p *Parallel) {
 	var err error
+
 	var protocolFactory thrift.TProtocolFactory
-	switch "binary" {
-	// case "compact":
-	// 	protocolFactory = thrift.NewTCompactProtocolFactory()
-	// case "simplejson":
-	// 	protocolFactory = thrift.NewTSimpleJSONProtocolFactory()
-	// case "json":
-	// 	protocolFactory = thrift.NewTJSONProtocolFactory()
-	case "binary", "":
-		protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
-	default:
-		log.Fatalln("invalid protocol")
-	}
+	protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
 
 	var transportFactory thrift.TTransportFactory
-	// transportFactory = thrift.NewTTransportFactory()
+	transportFactory = thrift.NewTTransportFactory()
 	transportFactory = thrift.NewTFramedTransportFactory(transportFactory)
 
 	var transport thrift.TServerTransport
@@ -212,6 +239,7 @@ func main() {
 		mainMaster(&p)
 	} else {
 		fmt.Fprintf(logger, fmt.Sprintf("running as slave\n"))
+		mainSlave(&p)
 	}
 
 	p.worker.Wait()
