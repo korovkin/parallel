@@ -100,6 +100,22 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	// execute remotely:
 	if len(p.Slaves) > 0 {
 		slave := p.Slaves[ticket%len(p.Slaves)]
+
+		var transport thrift.TTransport
+		transport, err = thrift.NewTSocket(slave.Address)
+		if err != nil {
+			log.Fatalln("failed to dial slave:", err.Error())
+		}
+
+		transport = p.transportFactory.GetTransport(transport)
+		err = transport.Open()
+		if err != nil {
+			log.Fatalln("failed to open:", err.Error())
+		}
+
+		defer transport.Close()
+		slave.Client = parallel.NewParallelClientFactory(transport, p.protocolFactory)
+
 		output, err = slave.Client.Execute(&parallel.Cmd{
 			CmdLine: cmdLine,
 			Ticket:  int64(ticket),
@@ -156,8 +172,7 @@ type Parallel struct {
 	transportFactory thrift.TTransportFactory
 
 	// master:
-	transport thrift.TTransport
-	Slaves    []*Slave
+	Slaves []*Slave
 
 	// slave:
 	handler         *ParallelSlaveHandler
@@ -167,9 +182,6 @@ type Parallel struct {
 
 func (p *Parallel) Close() {
 	p.worker.Wait()
-	if p.transport != nil {
-		p.transport.Close()
-	}
 }
 
 func mainMaster(p *Parallel) {
@@ -177,30 +189,27 @@ func mainMaster(p *Parallel) {
 
 	// connect to slaves:
 	for _, slave := range p.Slaves {
-		p.transport, err = thrift.NewTSocket(slave.Address)
-
-		if p.transport == nil {
-			log.Fatalln("failed allocate transport")
-		}
-
+		var transport thrift.TTransport
+		transport, err = thrift.NewTSocket(slave.Address)
 		if err != nil {
 			log.Fatalln("failed to dial slave:", err.Error())
 		}
 
-		p.transport = p.transportFactory.GetTransport(p.transport)
-
-		err = p.transport.Open()
+		transport = p.transportFactory.GetTransport(transport)
+		err = transport.Open()
 		if err != nil {
 			log.Fatalln("failed to open:", err.Error())
 		}
+		defer transport.Close()
 
-		slave.Client = parallel.NewParallelClientFactory(p.transport, p.protocolFactory)
+		slave.Client = parallel.NewParallelClientFactory(transport, p.protocolFactory)
 		ok, err := slave.Client.Ping()
 		if err != nil {
 			log.Fatalln("failed to ping client:", err.Error())
 		}
 
 		fmt.Fprintf(p.logger, fmt.Sprintf("adding slave: %s ok: %s", slave.Address, ok))
+
 	}
 
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
