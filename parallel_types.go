@@ -185,11 +185,137 @@ func (p *Cmd) String() string {
 }
 
 // Attributes:
+//  - Stdout
+//  - Stderr
+type Output struct {
+	Stdout string `thrift:"stdout,1" json:"stdout"`
+	Stderr string `thrift:"stderr,2" json:"stderr"`
+}
+
+func NewOutput() *Output {
+	return &Output{}
+}
+
+func (p *Output) GetStdout() string {
+	return p.Stdout
+}
+
+func (p *Output) GetStderr() string {
+	return p.Stderr
+}
+func (p *Output) Read(iprot thrift.TProtocol) error {
+	if _, err := iprot.ReadStructBegin(); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()
+		if err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+		switch fieldId {
+		case 1:
+			if err := p.readField1(iprot); err != nil {
+				return err
+			}
+		case 2:
+			if err := p.readField2(iprot); err != nil {
+				return err
+			}
+		default:
+			if err := iprot.Skip(fieldTypeId); err != nil {
+				return err
+			}
+		}
+		if err := iprot.ReadFieldEnd(); err != nil {
+			return err
+		}
+	}
+	if err := iprot.ReadStructEnd(); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	}
+	return nil
+}
+
+func (p *Output) readField1(iprot thrift.TProtocol) error {
+	if v, err := iprot.ReadString(); err != nil {
+		return thrift.PrependError("error reading field 1: ", err)
+	} else {
+		p.Stdout = v
+	}
+	return nil
+}
+
+func (p *Output) readField2(iprot thrift.TProtocol) error {
+	if v, err := iprot.ReadString(); err != nil {
+		return thrift.PrependError("error reading field 2: ", err)
+	} else {
+		p.Stderr = v
+	}
+	return nil
+}
+
+func (p *Output) Write(oprot thrift.TProtocol) error {
+	if err := oprot.WriteStructBegin("Output"); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+	}
+	if err := p.writeField1(oprot); err != nil {
+		return err
+	}
+	if err := p.writeField2(oprot); err != nil {
+		return err
+	}
+	if err := oprot.WriteFieldStop(); err != nil {
+		return thrift.PrependError("write field stop error: ", err)
+	}
+	if err := oprot.WriteStructEnd(); err != nil {
+		return thrift.PrependError("write struct stop error: ", err)
+	}
+	return nil
+}
+
+func (p *Output) writeField1(oprot thrift.TProtocol) (err error) {
+	if err := oprot.WriteFieldBegin("stdout", thrift.STRING, 1); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:stdout: ", p), err)
+	}
+	if err := oprot.WriteString(string(p.Stdout)); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T.stdout (1) field write error: ", p), err)
+	}
+	if err := oprot.WriteFieldEnd(); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T write field end error 1:stdout: ", p), err)
+	}
+	return err
+}
+
+func (p *Output) writeField2(oprot thrift.TProtocol) (err error) {
+	if err := oprot.WriteFieldBegin("stderr", thrift.STRING, 2); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:stderr: ", p), err)
+	}
+	if err := oprot.WriteString(string(p.Stderr)); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T.stderr (2) field write error: ", p), err)
+	}
+	if err := oprot.WriteFieldEnd(); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T write field end error 2:stderr: ", p), err)
+	}
+	return err
+}
+
+func (p *Output) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Output(%+v)", *p)
+}
+
+// Attributes:
 //  - What
 //  - Output
 type ExecuteException struct {
-	What   string `thrift:"what,1" json:"what"`
-	Output string `thrift:"output,2" json:"output"`
+	What   string  `thrift:"what,1" json:"what"`
+	Output *Output `thrift:"output,2" json:"output"`
 }
 
 func NewExecuteException() *ExecuteException {
@@ -200,9 +326,18 @@ func (p *ExecuteException) GetWhat() string {
 	return p.What
 }
 
-func (p *ExecuteException) GetOutput() string {
+var ExecuteException_Output_DEFAULT *Output
+
+func (p *ExecuteException) GetOutput() *Output {
+	if !p.IsSetOutput() {
+		return ExecuteException_Output_DEFAULT
+	}
 	return p.Output
 }
+func (p *ExecuteException) IsSetOutput() bool {
+	return p.Output != nil
+}
+
 func (p *ExecuteException) Read(iprot thrift.TProtocol) error {
 	if _, err := iprot.ReadStructBegin(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
@@ -250,10 +385,9 @@ func (p *ExecuteException) readField1(iprot thrift.TProtocol) error {
 }
 
 func (p *ExecuteException) readField2(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadString(); err != nil {
-		return thrift.PrependError("error reading field 2: ", err)
-	} else {
-		p.Output = v
+	p.Output = &Output{}
+	if err := p.Output.Read(iprot); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Output), err)
 	}
 	return nil
 }
@@ -291,11 +425,11 @@ func (p *ExecuteException) writeField1(oprot thrift.TProtocol) (err error) {
 }
 
 func (p *ExecuteException) writeField2(oprot thrift.TProtocol) (err error) {
-	if err := oprot.WriteFieldBegin("output", thrift.STRING, 2); err != nil {
+	if err := oprot.WriteFieldBegin("output", thrift.STRUCT, 2); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:output: ", p), err)
 	}
-	if err := oprot.WriteString(string(p.Output)); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T.output (2) field write error: ", p), err)
+	if err := p.Output.Write(oprot); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Output), err)
 	}
 	if err := oprot.WriteFieldEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write field end error 2:output: ", p), err)

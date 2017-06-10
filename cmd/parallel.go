@@ -75,47 +75,59 @@ func newLogger(ticket int) *logger {
 	return l
 }
 
-func executeCommand(p *Parallel, ticket int, cmdLine string) bool {
+func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, error) {
 	T_START := time.Now()
-	logger := newLogger(ticket)
+	var err error
+	output := &parallel.Output{}
+
+	loggerOut := newLogger(ticket)
+	loggerErr := newLogger(ticket)
 
 	defer func() {
-		fmt.Fprintf(logger, "done: dt: "+time.Since(T_START).String()+"\n")
+		fmt.Fprintf(
+			loggerOut,
+			"execute: done: dt: "+time.Since(T_START).String()+"\n",
+		)
 	}()
 
+	// execute remotely:
 	if len(p.Slaves) > 0 {
 		slave := p.Slaves[ticket%len(p.Slaves)]
-		output, err := slave.Client.Execute(&parallel.Cmd{
+		output, err = slave.Client.Execute(&parallel.Cmd{
 			CmdLine: cmdLine,
 			Ticket:  int64(ticket),
 		})
 		if err != nil {
 			log.Fatalln("failed to execute:", err.Error())
 		}
-		fmt.Fprintf(logger, "execute: output: '"+output+"'\n")
+		fmt.Fprintf(loggerOut, "execute: remotely: output: '"+output.Stdout+"'\n")
+		return output, err
 	}
 
+	// execute locally:
 	cs := []string{"/bin/sh", "-c", cmdLine}
 	cmd := exec.Command(cs[0], cs[1:]...)
 	cmd.Stdin = nil
-	cmd.Stdout = logger
-	cmd.Stderr = logger
+	cmd.Stdout = loggerOut
+	cmd.Stderr = loggerErr
 	cmd.Env = append(
 		os.Environ(),
 		fmt.Sprintf("PARALLEL_TICKER=%d", ticket),
 	)
 
-	fmt.Fprintf(logger, "run: '"+cmdLine+"'\n")
+	fmt.Fprintf(loggerOut, "run: '"+cmdLine+"'\n")
 
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		log.Fatalln("failed to start:", err)
-		return true
+		return output, err
 	}
 
-	err = cmd.Wait()
+	if err == nil {
+		err = cmd.Wait()
+	}
 
-	return true
+	return output, err
 }
 
 type Slave struct {
@@ -172,9 +184,12 @@ func mainMaster(p *Parallel) {
 		}
 
 		slave.Client = parallel.NewParallelClientFactory(p.transport, p.protocolFactory)
-		slave.Client.Ping()
+		ok, err := slave.Client.Ping()
+		if err != nil {
+			log.Fatalln("failed to ping client:", err.Error())
+		}
 
-		fmt.Fprintf(p.logger, fmt.Sprintf("adding slave: %s", slave.Address))
+		fmt.Fprintf(p.logger, fmt.Sprintf("adding slave: %s ok: %s", slave.Address, ok))
 	}
 
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
@@ -193,20 +208,23 @@ func mainMaster(p *Parallel) {
 }
 
 type ParallelSlaveHandler struct {
+	p *Parallel
 }
 
 func NewParallelSlaveHandler() *ParallelSlaveHandler {
 	return &ParallelSlaveHandler{}
 }
 
-func (p *ParallelSlaveHandler) Execute(command *parallel.Cmd) (r string, err error) {
+func (p *ParallelSlaveHandler) Execute(command *parallel.Cmd) (output *parallel.Output, err error) {
 	log.Println("ParallelSlaveHandler: Execute: ", command.CmdLine)
-	return "ok", nil
+	output, err = executeCommand(p.p, int(command.Ticket), command.CmdLine)
+	// TODO:: recover, handle panics
+	return output, err
 }
 
 func (p *ParallelSlaveHandler) Ping() (r string, err error) {
 	log.Println("ParallelSlaveHandler: Ping")
-	return "ok", nil
+	return "ping:ok", nil
 }
 
 func mainSlave(p *Parallel) {
@@ -220,6 +238,7 @@ func mainSlave(p *Parallel) {
 	}
 
 	p.handler = NewParallelSlaveHandler()
+	p.handler.p = p
 
 	server := thrift.NewTSimpleServer4(
 		parallel.NewParallelProcessor(p.handler),
@@ -269,12 +288,16 @@ func main() {
 	p.logger = logger
 	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
 	p.address = *address
-	defer p.Close()
-
+	p.Slaves = []*Slave{}
 	for _, slaveAddr := range strings.Split(*slaves, ",") {
+		if slaveAddr == "" {
+			continue
+		}
 		slave := Slave{Address: slaveAddr}
 		p.Slaves = append(p.Slaves, &slave)
 	}
+
+	defer p.Close()
 
 	// thrift protocol
 	p.protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()

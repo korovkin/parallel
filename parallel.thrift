@@ -8,9 +8,14 @@ struct Cmd {
   2: i64 ticket = 0;
 }
 
+struct Output {
+  1: string stdout;
+  2: string stderr;
+}
+
 exception ExecuteException {
   1: string what;
-  2: string output;
+  2: Output output;
 }
 
 service Parallel {
@@ -18,6 +23,6 @@ service Parallel {
    string Ping();
 
    // execute a shell command:
-   string Execute(1:Cmd command) 
-        throws (1:ExecuteException e);
+    Output Execute(1:Cmd command) 
+            throws (1:ExecuteException e);
 }

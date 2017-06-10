@@ -18,7 +18,7 @@ type Parallel interface {
 	Ping() (r string, err error)
 	// Parameters:
 	//  - Command
-	Execute(command *Cmd) (r string, err error)
+	Execute(command *Cmd) (r *Output, err error)
 }
 
 type ParallelClient struct {
@@ -122,7 +122,7 @@ func (p *ParallelClient) recvPing() (value string, err error) {
 
 // Parameters:
 //  - Command
-func (p *ParallelClient) Execute(command *Cmd) (r string, err error) {
+func (p *ParallelClient) Execute(command *Cmd) (r *Output, err error) {
 	if err = p.sendExecute(command); err != nil {
 		return
 	}
@@ -151,7 +151,7 @@ func (p *ParallelClient) sendExecute(command *Cmd) (err error) {
 	return oprot.Flush()
 }
 
-func (p *ParallelClient) recvExecute() (value string, err error) {
+func (p *ParallelClient) recvExecute() (value *Output, err error) {
 	iprot := p.InputProtocol
 	if iprot == nil {
 		iprot = p.ProtocolFactory.GetProtocol(p.Transport)
@@ -312,7 +312,7 @@ func (p *parallelProcessorExecute) Process(seqId int32, iprot, oprot thrift.TPro
 
 	iprot.ReadMessageEnd()
 	result := ParallelExecuteResult{}
-	var retval string
+	var retval *Output
 	var err2 error
 	if retval, err2 = p.handler.Execute(args.Command); err2 != nil {
 		switch v := err2.(type) {
@@ -327,7 +327,7 @@ func (p *parallelProcessorExecute) Process(seqId int32, iprot, oprot thrift.TPro
 			return true, err2
 		}
 	} else {
-		result.Success = &retval
+		result.Success = retval
 	}
 	if err2 = oprot.WriteMessageBegin("Execute", thrift.REPLY, seqId); err2 != nil {
 		err = err2
@@ -607,7 +607,7 @@ func (p *ParallelExecuteArgs) String() string {
 //  - Success
 //  - E
 type ParallelExecuteResult struct {
-	Success *string           `thrift:"success,0" json:"success,omitempty"`
+	Success *Output           `thrift:"success,0" json:"success,omitempty"`
 	E       *ExecuteException `thrift:"e,1" json:"e,omitempty"`
 }
 
@@ -615,13 +615,13 @@ func NewParallelExecuteResult() *ParallelExecuteResult {
 	return &ParallelExecuteResult{}
 }
 
-var ParallelExecuteResult_Success_DEFAULT string
+var ParallelExecuteResult_Success_DEFAULT *Output
 
-func (p *ParallelExecuteResult) GetSuccess() string {
+func (p *ParallelExecuteResult) GetSuccess() *Output {
 	if !p.IsSetSuccess() {
 		return ParallelExecuteResult_Success_DEFAULT
 	}
-	return *p.Success
+	return p.Success
 }
 
 var ParallelExecuteResult_E_DEFAULT *ExecuteException
@@ -678,10 +678,9 @@ func (p *ParallelExecuteResult) Read(iprot thrift.TProtocol) error {
 }
 
 func (p *ParallelExecuteResult) readField0(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadString(); err != nil {
-		return thrift.PrependError("error reading field 0: ", err)
-	} else {
-		p.Success = &v
+	p.Success = &Output{}
+	if err := p.Success.Read(iprot); err != nil {
+		return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
 	}
 	return nil
 }
@@ -715,11 +714,11 @@ func (p *ParallelExecuteResult) Write(oprot thrift.TProtocol) error {
 
 func (p *ParallelExecuteResult) writeField0(oprot thrift.TProtocol) (err error) {
 	if p.IsSetSuccess() {
-		if err := oprot.WriteFieldBegin("success", thrift.STRING, 0); err != nil {
+		if err := oprot.WriteFieldBegin("success", thrift.STRUCT, 0); err != nil {
 			return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err)
 		}
-		if err := oprot.WriteString(string(*p.Success)); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T.success (0) field write error: ", p), err)
+		if err := p.Success.Write(oprot); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Success), err)
 		}
 		if err := oprot.WriteFieldEnd(); err != nil {
 			return thrift.PrependError(fmt.Sprintf("%T write field end error 0:success: ", p), err)

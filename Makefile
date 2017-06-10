@@ -1,4 +1,7 @@
 
+travis:
+	go build
+
 build: thrift
 	go build
 
