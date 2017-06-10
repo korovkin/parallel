@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	_ "io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -25,7 +24,7 @@ type logger struct {
 
 var (
 	loggerMutex     = new(sync.Mutex)
-	loggerIndex     = uint32(0)
+	loggerIndex     = int(0)
 	loggerStartTime = time.Now()
 )
 
@@ -129,6 +128,7 @@ func main() {
 			break
 		}
 		line = strings.TrimSpace(line)
+
 		worker.ExecuteWithTicket(func(ticket int) {
 			executeCommand(ticket, line)
 		})
