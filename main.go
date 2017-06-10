@@ -2,47 +2,140 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
+	"fmt"
 	"io"
 	_ "io/ioutil"
 	"log"
 	"os"
-	_ "os/exec"
+	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/daviddengcn/go-colortext"
 	"github.com/korovkin/limiter"
 	_ "github.com/korovkin/worker"
 )
 
+type logger struct {
+	ticket int
+}
+
+var (
+	loggerMutex = new(sync.Mutex)
+	loggerIndex = uint32(0)
+)
+
+var colors = []ct.Color{
+	ct.Green,
+	ct.Cyan,
+	ct.Magenta,
+	ct.Yellow,
+	ct.Blue,
+	ct.Red,
+}
+
+func (l *logger) Write(p []byte) (int, error) {
+	buf := bytes.NewBuffer(p)
+	wrote := 0
+	for {
+		line, err := buf.ReadBytes('\n')
+		if len(line) > 1 {
+			now := time.Now().Format("15:04:05")
+			s := string(line)
+
+			loggerMutex.Lock()
+			ct.ChangeColor(colors[l.ticket%len(colors)], false, ct.None, false)
+			fmt.Printf("%s %d | ", now, l.ticket)
+			ct.ResetColor()
+			fmt.Print(s)
+			loggerMutex.Unlock()
+
+			wrote += len(line)
+		}
+		if err != nil {
+			break
+		}
+	}
+	if len(p) > 0 && p[len(p)-1] != '\n' {
+		fmt.Println()
+	}
+
+	return len(p), nil
+}
+
+func newLogger(ticket int) *logger {
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+	l := &logger{ticket}
+	return l
+}
+
+func executeCommand(ticket int, cmdLine string) bool {
+	T_START := time.Now()
+	logger := newLogger(ticket)
+
+	defer func() {
+		fmt.Fprintf(logger, "ticket: done: dt:"+time.Since(T_START).String()+"\n")
+	}()
+
+	cs := []string{"/bin/sh", "-c", cmdLine}
+	cmd := exec.Command(cs[0], cs[1:]...)
+	cmd.Stdin = nil
+	cmd.Stdout = logger
+	cmd.Stderr = logger
+	cmd.Env = append(
+		os.Environ(),
+		fmt.Sprintf("PARALLEL_TICKER=%d", ticket),
+	)
+
+	fmt.Fprintf(logger, "ticket: run: '"+cmdLine+"'\n")
+
+	err := cmd.Start()
+	if err != nil {
+		log.Fatalln("failed to start:", err)
+		return true
+	}
+
+	err = cmd.Wait()
+
+	return true
+}
+
 func main() {
 	T_START := time.Now()
+	logger := newLogger(0)
 	defer func() {
-		log.Println("done dt:", time.Since(T_START))
+		fmt.Fprintf(logger, "DONE: DT: "+time.Since(T_START).String()+"\n")
 	}()
 
 	flag_jobs := flag.Int(
 		"j",
-		1,
+		2,
 		"num of concurrent jobs")
 
 	flag.Parse()
+	log.Println("concurrent job:", *flag_jobs)
 	worker := limiter.NewConcurrencyLimiter(*flag_jobs)
 
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
 	log.Println("reading from stdin...")
+
 	for {
 		line, err := r.ReadString('\n')
 
 		if err == io.EOF {
-			log.Println("eof")
 			break
 		}
 
 		line = strings.TrimSpace(line)
-		log.Println("execute: ", line)
+
+		worker.ExecuteWithTicket(func(ticket int) {
+			executeCommand(ticket, line)
+		})
 	}
 
-	log.Println("wait")
 	worker.Wait()
 }
