@@ -21,6 +21,7 @@ import (
 
 type logger struct {
 	ticket int
+	buf    *bytes.Buffer
 }
 
 var (
@@ -52,6 +53,11 @@ func (l *logger) Write(p []byte) (int, error) {
 			ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
 			fmt.Printf("[%14s %s %d] ", ts, now, l.ticket)
 			ct.ResetColor()
+
+			if l.buf != nil {
+				l.buf.Write([]byte(s))
+			}
+
 			fmt.Print(s)
 			loggerMutex.Unlock()
 
@@ -68,10 +74,11 @@ func (l *logger) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func newLogger(ticket int) *logger {
-	loggerMutex.Lock()
-	defer loggerMutex.Unlock()
-	l := &logger{ticket}
+func newLogger(ticket int, collectLines bool) *logger {
+	l := &logger{ticket: ticket, buf: nil}
+	if collectLines {
+		l.buf = &bytes.Buffer{}
+	}
 	return l
 }
 
@@ -80,8 +87,8 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	var err error
 	output := &parallel.Output{}
 
-	loggerOut := newLogger(ticket)
-	loggerErr := newLogger(ticket)
+	loggerOut := newLogger(ticket, true)
+	loggerErr := newLogger(ticket, true)
 
 	defer func() {
 		fmt.Fprintf(
@@ -100,7 +107,8 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		if err != nil {
 			log.Fatalln("failed to execute:", err.Error())
 		}
-		fmt.Fprintf(loggerOut, "execute: remotely: output: '"+output.Stdout+"'\n")
+		fmt.Fprintf(loggerOut, "execute: remotely: stdout: '"+output.Stdout+"'\n")
+		fmt.Fprintf(loggerErr, "execute: remotely: stderr: '"+output.Stderr+"'\n")
 		return output, err
 	}
 
@@ -126,6 +134,9 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	if err == nil {
 		err = cmd.Wait()
 	}
+
+	output.Stdout = string(loggerOut.buf.Bytes())
+	output.Stderr = string(loggerErr.buf.Bytes())
 
 	return output, err
 }
@@ -254,7 +265,7 @@ func mainSlave(p *Parallel) {
 
 func main() {
 	T_START := time.Now()
-	logger := newLogger(0)
+	logger := newLogger(0, false)
 	defer func() {
 		fmt.Fprintf(logger, "all done: dt: "+time.Since(T_START).String()+"\n")
 	}()
