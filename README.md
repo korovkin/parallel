@@ -1,6 +1,7 @@
 # parallel
 
 where `xargs` meets `foreman` or `goreman` for controlled, concurrent execution of shell commands.
+
 inspired by https://www.gnu.org/software/parallel/
 
 ## builds
