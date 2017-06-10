@@ -15,7 +15,6 @@ import (
 
 	"github.com/daviddengcn/go-colortext"
 	"github.com/korovkin/limiter"
-	_ "github.com/korovkin/worker"
 )
 
 type logger struct {
@@ -45,10 +44,11 @@ func (l *logger) Write(p []byte) (int, error) {
 		if len(line) > 1 {
 			now := time.Now().Format("15:04:05")
 			s := string(line)
+			ts := time.Since(loggerStartTime).String()
 
 			loggerMutex.Lock()
 			ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-			fmt.Printf("[%14s %s %d] ", time.Since(loggerStartTime).String(), now, l.ticket)
+			fmt.Printf("[%14s %s %d] ", ts, now, l.ticket)
 			ct.ResetColor()
 			fmt.Print(s)
 			loggerMutex.Unlock()
