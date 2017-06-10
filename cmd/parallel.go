@@ -13,8 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/daviddengcn/go-colortext"
 	"github.com/korovkin/limiter"
+	"github.com/korovkin/parallel"
 )
 
 type logger struct {
@@ -104,9 +106,10 @@ func executeCommand(ticket int, cmdLine string) bool {
 }
 
 type Parallel struct {
-	jobs   int
-	logger *logger
-	worker *limiter.ConcurrencyLimiter
+	jobs    int
+	logger  *logger
+	worker  *limiter.ConcurrencyLimiter
+	address string
 }
 
 func mainMaster(p *Parallel) {
@@ -125,6 +128,60 @@ func mainMaster(p *Parallel) {
 	}
 }
 
+type ParallelSlaveHandler struct {
+}
+
+func NewParallelSlaveHandler() *ParallelSlaveHandler {
+	return &ParallelSlaveHandler{}
+}
+
+func (p *ParallelSlaveHandler) Execute(command *parallel.Cmd) (r string, err error) {
+	log.Println("ParallelSlaveHandler: Execute: ", command.CmdLine)
+	return "ok", nil
+}
+
+func mainSlave(p *Parallel) {
+	var err error
+	var protocolFactory thrift.TProtocolFactory
+	switch "binary" {
+	// case "compact":
+	// 	protocolFactory = thrift.NewTCompactProtocolFactory()
+	// case "simplejson":
+	// 	protocolFactory = thrift.NewTSimpleJSONProtocolFactory()
+	// case "json":
+	// 	protocolFactory = thrift.NewTJSONProtocolFactory()
+	case "binary", "":
+		protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
+	default:
+		log.Fatalln("invalid protocol")
+	}
+
+	var transportFactory thrift.TTransportFactory
+	// transportFactory = thrift.NewTTransportFactory()
+	transportFactory = thrift.NewTFramedTransportFactory(transportFactory)
+
+	var transport thrift.TServerTransport
+	transport, err = thrift.NewTServerSocket(p.address)
+
+	if err != nil {
+		log.Fatalln("failed to start server:", err.Error())
+		return
+	}
+
+	handler := NewParallelSlaveHandler()
+	processor := parallel.NewParallelProcessor(handler)
+	server := thrift.NewTSimpleServer4(
+		processor,
+		transport,
+		transportFactory,
+		protocolFactory)
+
+	err = server.Serve()
+	if err != nil {
+		log.Fatalln("failed to run slave:", err.Error())
+	}
+}
+
 func main() {
 	T_START := time.Now()
 	logger := newLogger(0)
@@ -136,10 +193,6 @@ func main() {
 		"j",
 		2,
 		"num of concurrent jobs")
-	flag_master := flag.Bool(
-		"master",
-		true,
-		"run as master")
 	flag_slave := flag.Bool(
 		"slave",
 		false,
@@ -152,10 +205,13 @@ func main() {
 	p.jobs = *flag_jobs
 	p.logger = logger
 	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
+	p.address = "localhost:9010"
 
-	if *flag_master {
+	if *flag_slave == false {
+		fmt.Fprintf(logger, fmt.Sprintf("running as master\n"))
 		mainMaster(&p)
-	} else if *flag_slave {
+	} else {
+		fmt.Fprintf(logger, fmt.Sprintf("running as slave\n"))
 	}
 
 	p.worker.Wait()
