@@ -134,10 +134,10 @@ type Parallel struct {
 }
 
 func (p *Parallel) Close() {
+	p.worker.Wait()
 	if p.transport != nil {
 		p.transport.Close()
 	}
-	p.worker.Wait()
 }
 
 func mainMaster(p *Parallel) {
