@@ -103,6 +103,29 @@ func executeCommand(ticket int, cmdLine string) bool {
 	return true
 }
 
+type Parallel struct {
+	jobs   int
+	logger *logger
+	worker *limiter.ConcurrencyLimiter
+}
+
+func mainMaster(p *Parallel) {
+	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
+	fmt.Fprintf(p.logger, "reading from stdin...\n")
+	for {
+		line, err := r.ReadString('\n')
+		if err == io.EOF {
+			break
+		}
+		line = strings.TrimSpace(line)
+
+		p.worker.ExecuteWithTicket(func(ticket int) {
+			executeCommand(ticket, line)
+		})
+	}
+	p.worker.Wait()
+}
+
 func main() {
 	T_START := time.Now()
 	logger := newLogger(0)
@@ -114,25 +137,24 @@ func main() {
 		"j",
 		2,
 		"num of concurrent jobs")
+	flag_master := flag.Bool(
+		"master",
+		true,
+		"run as master")
+	flag_slave := flag.Bool(
+		"slave",
+		false,
+		"run as slave")
 
 	flag.Parse()
 	fmt.Fprintf(logger, fmt.Sprintf("concurrency limit: %d", *flag_jobs))
-	worker := limiter.NewConcurrencyLimiter(*flag_jobs)
 
-	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
-	fmt.Fprintf(logger, "reading from stdin...\n")
-
-	for {
-		line, err := r.ReadString('\n')
-		if err == io.EOF {
-			break
-		}
-		line = strings.TrimSpace(line)
-
-		worker.ExecuteWithTicket(func(ticket int) {
-			executeCommand(ticket, line)
-		})
+	if *flag_master {
+		p := Parallel{}
+		p.jobs = *flag_jobs
+		p.logger = logger
+		p.worker = limiter.NewConcurrencyLimiter(p.jobs)
+		mainMaster(&p)
+	} else if *flag_slave {
 	}
-
-	worker.Wait()
 }
