@@ -137,6 +137,7 @@ func (p *Parallel) Close() {
 	if p.transport != nil {
 		p.transport.Close()
 	}
+	p.worker.Wait()
 }
 
 func mainMaster(p *Parallel) {
@@ -249,6 +250,7 @@ func main() {
 	p.logger = logger
 	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
 	p.address = "localhost:9010"
+	defer p.Close()
 
 	// thrift protocol
 	p.protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
@@ -264,7 +266,4 @@ func main() {
 		fmt.Fprintf(logger, fmt.Sprintf("running as slave\n"))
 		mainSlave(&p)
 	}
-
-	p.worker.Wait()
-	p.Close()
 }
