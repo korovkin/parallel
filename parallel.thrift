@@ -8,7 +8,6 @@ struct Cmd {
   2: i64 ticket = 0;
 }
 
-
 struct Output {
   1: string stdout;
   2: string stderr;
