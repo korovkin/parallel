@@ -24,11 +24,12 @@ type logger struct {
 }
 
 var (
-	loggerMutex = new(sync.Mutex)
-	loggerIndex = uint32(0)
+	loggerMutex     = new(sync.Mutex)
+	loggerIndex     = uint32(0)
+	loggerStartTime = time.Now()
 )
 
-var colors = []ct.Color{
+var loggerColors = []ct.Color{
 	ct.Green,
 	ct.Cyan,
 	ct.Magenta,
@@ -47,8 +48,8 @@ func (l *logger) Write(p []byte) (int, error) {
 			s := string(line)
 
 			loggerMutex.Lock()
-			ct.ChangeColor(colors[l.ticket%len(colors)], false, ct.None, false)
-			fmt.Printf("%s %d | ", now, l.ticket)
+			ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
+			fmt.Printf("[%14s %s %d] ", time.Since(loggerStartTime).String(), now, l.ticket)
 			ct.ResetColor()
 			fmt.Print(s)
 			loggerMutex.Unlock()
@@ -78,7 +79,7 @@ func executeCommand(ticket int, cmdLine string) bool {
 	logger := newLogger(ticket)
 
 	defer func() {
-		fmt.Fprintf(logger, "ticket: done: dt:"+time.Since(T_START).String()+"\n")
+		fmt.Fprintf(logger, "done: dt: "+time.Since(T_START).String()+"\n")
 	}()
 
 	cs := []string{"/bin/sh", "-c", cmdLine}
@@ -91,7 +92,7 @@ func executeCommand(ticket int, cmdLine string) bool {
 		fmt.Sprintf("PARALLEL_TICKER=%d", ticket),
 	)
 
-	fmt.Fprintf(logger, "ticket: run: '"+cmdLine+"'\n")
+	fmt.Fprintf(logger, "run: '"+cmdLine+"'\n")
 
 	err := cmd.Start()
 	if err != nil {
@@ -107,7 +108,7 @@ func main() {
 	T_START := time.Now()
 	logger := newLogger(0)
 	defer func() {
-		fmt.Fprintf(logger, "DONE: DT: "+time.Since(T_START).String()+"\n")
+		fmt.Fprintf(logger, "ALL DONE: dt: "+time.Since(T_START).String()+"\n")
 	}()
 
 	flag_jobs := flag.Int(
