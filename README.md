@@ -16,7 +16,7 @@ executing the following will install the tool into: `$GOPATH/bin/parallel`
 go get github.com:korovkin/parallel.git/...
 ```
 
-## compress/decompress 10 large files serial:
+## compress/decompress 10 large files (serially):
 
 ```
  # ls -sh
@@ -35,7 +35,7 @@ user	0m0.755s
 sys	0m0.466s
 ```
 
-## compress/decompress 10 large files concurrently:
+## compress/decompress 10 large files (concurrently with parallel):
 
 ```
 time for f in *.txt ; do echo gzip $f; done | $GOPATH/bin/parallel -j 10
