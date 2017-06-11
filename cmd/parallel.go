@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +19,9 @@ import (
 	"github.com/daviddengcn/go-colortext"
 	"github.com/korovkin/limiter"
 	"github.com/korovkin/parallel"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type logger struct {
@@ -84,7 +89,25 @@ func newLogger(ticket int, collectLines bool) *logger {
 	return l
 }
 
+func CheckFatal(e error) error {
+	if e != nil {
+		debug.PrintStack()
+		log.Println("CHECK: ERROR:", e)
+		panic(e)
+	}
+	return e
+}
+
+func CheckNotFatal(e error) error {
+	if e != nil {
+		debug.PrintStack()
+		log.Println("CHECK: ERROR:", e, e.Error())
+	}
+	return e
+}
+
 func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, error) {
+	p.StatNumCommandsStart.Inc()
 	T_START := time.Now()
 	var err error
 	output := &parallel.Output{}
@@ -92,10 +115,15 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	loggerErr := newLogger(ticket, true)
 
 	defer func() {
+		dt := time.Since(T_START)
 		fmt.Fprintf(
 			loggerOut,
-			"execute: done: dt: "+time.Since(T_START).String()+"\n",
+			"execute: done: dt: "+dt.String()+"\n",
 		)
+		if err == nil {
+			p.StatNumCommandsDone.Inc()
+			p.StatCommandLatency.Observe(dt.Seconds())
+		}
 	}()
 
 	// execute remotely:
@@ -204,6 +232,10 @@ type Parallel struct {
 	handler         *ParallelSlaveHandler
 	serverTransport thrift.TServerTransport
 	slaveAddress    string
+
+	StatNumCommandsStart prometheus.Counter
+	StatNumCommandsDone  prometheus.Counter
+	StatCommandLatency   prometheus.Summary
 }
 
 func (p *Parallel) Close() {
@@ -335,6 +367,11 @@ func main() {
 		"localhost:9010",
 		"slave address")
 
+	flag_slave_metrics_address := flag.String(
+		"metrics_address",
+		"localhost:9011",
+		"slave metric address")
+
 	loggerHostname, _ = os.Hostname()
 
 	flag.Parse()
@@ -363,6 +400,28 @@ func main() {
 	p.transportFactory = thrift.NewTTransportFactory()
 	p.transportFactory = thrift.NewTFramedTransportFactory(p.transportFactory)
 
+	// stats:
+	p.StatNumCommandsStart = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "num_commands_start",
+			Help: "num received"})
+	err := prometheus.Register(p.StatNumCommandsStart)
+	CheckFatal(err)
+
+	p.StatNumCommandsDone = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "num_commands_done",
+			Help: "num received"})
+	err = prometheus.Register(p.StatNumCommandsDone)
+	CheckFatal(err)
+
+	p.StatCommandLatency = prometheus.NewSummary(prometheus.SummaryOpts{
+		Name: "commands_latency",
+		Help: "commands latency stat",
+	})
+	err = prometheus.Register(p.StatCommandLatency)
+	CheckFatal(err)
+
 	if *flag_slave == false {
 		loggerHostname = p.slaveAddress
 		logger.hostname = loggerHostname
@@ -372,6 +431,19 @@ func main() {
 	} else {
 		loggerHostname = p.slaveAddress
 		logger.hostname = loggerHostname
+
+		// metrics
+		metricsHandler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})
+		http.HandleFunc("/metrics", func(c http.ResponseWriter, req *http.Request) {
+			metricsHandler.ServeHTTP(c, req)
+		})
+
+		http.HandleFunc("/",
+			func(c http.ResponseWriter, req *http.Request) {
+				io.WriteString(c, fmt.Sprintf("parallel %s", time.Now().String()))
+			})
+
+		go http.ListenAndServe(*flag_slave_metrics_address, nil)
 
 		fmt.Fprintf(logger, "running as slave on: %s\n", p.slaveAddress)
 		mainSlave(&p)
