@@ -322,7 +322,7 @@ func main() {
 		false,
 		"run as slave")
 
-	slaves := flag.String(
+	flag_slaves := flag.String(
 		"slaves",
 		"",
 		"CSV list of slave addresses")
@@ -336,7 +336,7 @@ func main() {
 
 	flag.Parse()
 	fmt.Fprintf(logger, fmt.Sprintf("concurrency limit: %d", *flag_jobs))
-	fmt.Fprintf(logger, fmt.Sprintf("slaves: %s", *slaves))
+	fmt.Fprintf(logger, fmt.Sprintf("slaves: %s", *flag_slaves))
 
 	p := Parallel{}
 	p.jobs = *flag_jobs
@@ -344,12 +344,11 @@ func main() {
 	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
 	p.address = *address
 	p.Slaves = []*Slave{}
-	for _, slaveAddr := range strings.Split(*slaves, ",") {
-		if slaveAddr == "" {
-			continue
+	for _, slaveAddr := range strings.Split(*flag_slaves, ",") {
+		if slaveAddr != "" {
+			slave := Slave{Address: slaveAddr}
+			p.Slaves = append(p.Slaves, &slave)
 		}
-		slave := Slave{Address: slaveAddr}
-		p.Slaves = append(p.Slaves, &slave)
 	}
 
 	defer p.Close()
