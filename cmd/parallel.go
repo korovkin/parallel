@@ -135,8 +135,15 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		loggerOut.hostname = hostname
 		loggerErr.hostname = hostname
 
-		fmt.Fprintf(loggerOut, "execute: remotely: host: %s stdout: [%s]\n", hostname, output.Stdout)
-		fmt.Fprintf(loggerErr, "execute: remotely: host: %s stderr: [%s]\n", hostname, output.Stderr)
+		fmt.Fprintf(loggerOut,
+			"execute: remotely: host: %s stdout: [%s]\n",
+			hostname,
+			output.Stdout)
+
+		fmt.Fprintf(loggerErr,
+			"execute: remotely: host: %s stderr: [%s]\n",
+			hostname,
+			output.Stderr)
 
 		return output, err
 	}
