@@ -203,7 +203,7 @@ type Parallel struct {
 	// slave:
 	handler         *ParallelSlaveHandler
 	serverTransport thrift.TServerTransport
-	address         string
+	slaveAddress    string
 }
 
 func (p *Parallel) Close() {
@@ -283,7 +283,7 @@ func (p *ParallelSlaveHandler) Ping() (r string, err error) {
 func mainSlave(p *Parallel) {
 	var err error
 
-	p.serverTransport, err = thrift.NewTServerSocket(p.address)
+	p.serverTransport, err = thrift.NewTServerSocket(p.slaveAddress)
 
 	if err != nil {
 		log.Fatalln("failed to start server:", err.Error())
@@ -327,7 +327,7 @@ func main() {
 		"",
 		"CSV list of slave addresses")
 
-	address := flag.String(
+	flag_slave_address := flag.String(
 		"address",
 		"localhost:9010",
 		"slave address")
@@ -342,7 +342,7 @@ func main() {
 	p.jobs = *flag_jobs
 	p.logger = logger
 	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
-	p.address = *address
+	p.slaveAddress = *flag_slave_address
 	p.Slaves = []*Slave{}
 	for _, slaveAddr := range strings.Split(*flag_slaves, ",") {
 		if slaveAddr != "" {
@@ -361,16 +361,16 @@ func main() {
 	p.transportFactory = thrift.NewTFramedTransportFactory(p.transportFactory)
 
 	if *flag_slave == false {
-		loggerHostname = p.address
+		loggerHostname = p.slaveAddress
 		logger.hostname = loggerHostname
 
-		fmt.Fprintf(logger, fmt.Sprintf("running as master\n"))
+		fmt.Fprintf(logger, "running as master\n")
 		mainMaster(&p)
 	} else {
-		loggerHostname = p.address
+		loggerHostname = p.slaveAddress
 		logger.hostname = loggerHostname
 
-		fmt.Fprintf(logger, fmt.Sprintf("running as slave on: %s\n", p.address))
+		fmt.Fprintf(logger, "running as slave on: %s\n", p.slaveAddress)
 		mainSlave(&p)
 	}
 }
