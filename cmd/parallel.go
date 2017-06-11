@@ -56,17 +56,17 @@ func (l *logger) Write(p []byte) (int, error) {
 			s := string(line)
 			ts := time.Since(loggerStartTime).String()
 
-			loggerMutex.Lock()
-			ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-			fmt.Printf("[%-14s %s %s %d] ", ts, l.hostname, now, l.ticket)
-			ct.ResetColor()
-
-			if l.buf != nil {
-				l.buf.Write([]byte(s))
+			{
+				loggerMutex.Lock()
+				ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
+				fmt.Printf("[%-14s %s %s %d] ", ts, l.hostname, now, l.ticket)
+				ct.ResetColor()
+				if l.buf != nil {
+					l.buf.Write([]byte(s))
+				}
+				fmt.Print(s)
+				loggerMutex.Unlock()
 			}
-
-			fmt.Print(s)
-			loggerMutex.Unlock()
 
 			wrote += len(line)
 		}
