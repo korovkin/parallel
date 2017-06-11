@@ -270,7 +270,6 @@ func (p *ParallelSlaveHandler) Execute(command *parallel.Cmd) (output *parallel.
 }
 
 func (p *ParallelSlaveHandler) Ping() (r string, err error) {
-	log.Println("ParallelSlaveHandler: Ping")
 	return "ping:ok", nil
 }
 
