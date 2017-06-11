@@ -338,8 +338,8 @@ func main() {
 	loggerHostname, _ = os.Hostname()
 
 	flag.Parse()
-	fmt.Fprintf(logger, fmt.Sprintf("concurrency limit: %d", *flag_jobs))
-	fmt.Fprintf(logger, fmt.Sprintf("slaves: %s", *flag_slaves))
+	fmt.Fprintf(logger, "concurrency limit: %d", *flag_jobs)
+	fmt.Fprintf(logger, "slaves: %s", *flag_slaves)
 
 	p := Parallel{}
 	p.jobs = *flag_jobs
