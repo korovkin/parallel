@@ -29,6 +29,7 @@ type logger struct {
 	hostname string
 	isError  bool
 	buf      *bytes.Buffer
+	verbose  bool
 }
 
 var (
@@ -36,6 +37,11 @@ var (
 	loggerIndex     = int(0)
 	loggerStartTime = time.Now()
 	loggerHostname  = ""
+
+	flag_verbose = flag.Bool(
+		"v",
+		false,
+		"verbose level: 1")
 )
 
 var loggerColors = []ct.Color{
@@ -61,7 +67,7 @@ func (l *logger) Write(p []byte) (int, error) {
 				e = "E"
 			}
 
-			{
+			if l.verbose {
 				loggerMutex.Lock()
 				ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
 				fmt.Printf("[%-14s %s %s %d %s] ", ts, l.hostname, now, l.ticket, e)
@@ -91,6 +97,7 @@ func newLogger(ticket int, collectLines bool) *logger {
 	if collectLines {
 		l.buf = &bytes.Buffer{}
 	}
+	l.verbose = true
 	return l
 }
 
@@ -170,15 +177,17 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		loggerOut.hostname = hostname
 		loggerErr.hostname = hostname
 
-		fmt.Fprintf(loggerOut,
-			"execute: remote: host: %s stdout: [%s]\n",
-			hostname,
-			output.Stdout)
+		if *flag_verbose {
+			fmt.Fprintf(loggerOut,
+				"execute: remote: host: %s stdout: [%s]\n",
+				hostname,
+				output.Stdout)
 
-		fmt.Fprintf(loggerErr,
-			"execute: remote: host: %s stderr: [%s]\n",
-			hostname,
-			output.Stderr)
+			fmt.Fprintf(loggerErr,
+				"execute: remote: host: %s stderr: [%s]\n",
+				hostname,
+				output.Stderr)
+		}
 
 		return output, err
 	}
@@ -194,7 +203,10 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		fmt.Sprintf("PARALLEL_TICKER=%d", ticket),
 	)
 
-	fmt.Fprintf(loggerOut, "run: '"+cmdLine+"'\n")
+	fmt.Fprintf(loggerOut, "start: '"+cmdLine+"'\n")
+
+	loggerOut.verbose = *flag_verbose
+	loggerErr.verbose = *flag_verbose
 
 	err = cmd.Start()
 	if err != nil {
@@ -205,6 +217,9 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	if err == nil {
 		err = cmd.Wait()
 	}
+
+	loggerOut.verbose = true
+	loggerErr.verbose = true
 
 	output.Tags = map[string]string{"hostname": loggerHostname}
 
