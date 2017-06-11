@@ -27,6 +27,7 @@ import (
 type logger struct {
 	ticket   int
 	hostname string
+	isError  bool
 	buf      *bytes.Buffer
 }
 
@@ -52,14 +53,18 @@ func (l *logger) Write(p []byte) (int, error) {
 	for {
 		line, err := buf.ReadBytes('\n')
 		if len(line) > 1 {
-			now := time.Now().Format("15:04:05")
+			now := time.Now().Format("15:01:02")
 			s := string(line)
 			ts := time.Since(loggerStartTime).String()
+			e := "I"
+			if l.isError {
+				e = "E"
+			}
 
 			{
 				loggerMutex.Lock()
 				ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-				fmt.Printf("[%-14s %s %s %d] ", ts, l.hostname, now, l.ticket)
+				fmt.Printf("[%-14s %s %s %d %s] ", ts, l.hostname, now, l.ticket, e)
 				ct.ResetColor()
 				if l.buf != nil {
 					l.buf.Write([]byte(s))
@@ -112,7 +117,9 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	var err error
 	output := &parallel.Output{}
 	loggerOut := newLogger(ticket, true)
+	loggerOut.isError = false
 	loggerErr := newLogger(ticket, true)
+	loggerErr.isError = true
 
 	defer func() {
 		dt := time.Since(T_START)
@@ -164,12 +171,12 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		loggerErr.hostname = hostname
 
 		fmt.Fprintf(loggerOut,
-			"execute: remotely: host: %s stdout: [%s]\n",
+			"execute: remote: host: %s stdout: [%s]\n",
 			hostname,
 			output.Stdout)
 
 		fmt.Fprintf(loggerErr,
-			"execute: remotely: host: %s stderr: [%s]\n",
+			"execute: remote: host: %s stderr: [%s]\n",
 			hostname,
 			output.Stderr)
 
