@@ -6,7 +6,7 @@ inspired by https://www.gnu.org/software/parallel/
 
 ## builds
 
-[![Build Status](https://travis-ci.org/korovkin/parallel.svg)](https://travis-ci.org/korovkin/limiter)
+[![Build Status](https://travis-ci.org/korovkin/parallel.svg)](https://travis-ci.org/korovkin/parallel)
 
 
 ## install:
