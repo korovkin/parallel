@@ -70,7 +70,7 @@ func (l *logger) Write(p []byte) (int, error) {
 			if l.verbose {
 				loggerMutex.Lock()
 				ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-				fmt.Printf("[%-14s %s %s %d %s] ", ts, l.hostname, now, l.ticket, e)
+				fmt.Printf("[%-14s %s %s %03d %s] ", ts, l.hostname, now, l.ticket, e)
 				ct.ResetColor()
 				if l.buf != nil {
 					l.buf.Write([]byte(s))
@@ -167,6 +167,9 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 			CmdLine: cmdLine,
 			Ticket:  int64(ticket),
 		}
+
+		loggerOut.hostname = slave.Address
+		fmt.Fprintf(loggerOut, "start: '"+cmdLine+"'\n")
 
 		output, err = client.Execute(&cmd)
 		if err != nil {
