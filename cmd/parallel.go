@@ -239,8 +239,11 @@ func mainMaster(p *Parallel) {
 			log.Fatalln("failed to ping client:", err.Error())
 		}
 
-		fmt.Fprintf(p.logger, fmt.Sprintf("adding slave: %s ok: %s", slave.Address, ok))
-
+		fmt.Fprintf(
+			p.logger,
+			"adding slave: %s ok: %s",
+			slave.Address,
+			ok)
 	}
 
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
