@@ -29,7 +29,7 @@ type logger struct {
 	hostname string
 	isError  bool
 	buf      *bytes.Buffer
-	verbose  bool
+	print    bool
 }
 
 var (
@@ -67,7 +67,7 @@ func (l *logger) Write(p []byte) (int, error) {
 				e = "E"
 			}
 
-			if l.verbose {
+			if l.print {
 				loggerMutex.Lock()
 				ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
 				fmt.Printf("[%-14s %s %s %03d %s] ", ts, l.hostname, now, l.ticket, e)
@@ -97,7 +97,7 @@ func newLogger(ticket int, collectLines bool) *logger {
 	if collectLines {
 		l.buf = &bytes.Buffer{}
 	}
-	l.verbose = true
+	l.print = true
 	return l
 }
 
@@ -208,8 +208,8 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 
 	fmt.Fprintf(loggerOut, "start: '"+cmdLine+"'\n")
 
-	loggerOut.verbose = *flag_verbose
-	loggerErr.verbose = *flag_verbose
+	loggerOut.print = *flag_verbose
+	loggerErr.print = *flag_verbose
 
 	err = cmd.Start()
 	if err != nil {
@@ -221,8 +221,8 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		err = cmd.Wait()
 	}
 
-	loggerOut.verbose = true
-	loggerErr.verbose = true
+	loggerOut.print = true
+	loggerErr.print = true
 
 	output.Tags = map[string]string{"hostname": loggerHostname}
 
