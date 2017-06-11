@@ -109,7 +109,11 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 			log.Fatalln("failed to dial slave:", err.Error())
 		}
 
-		transport = p.transportFactory.GetTransport(transport)
+		transport, err = p.transportFactory.GetTransport(transport)
+		if err != nil {
+			log.Fatalln("failed to GetTransport:", err.Error())
+		}
+
 		err = transport.Open()
 		if err != nil {
 			log.Fatalln("failed to open:", err.Error())
@@ -210,11 +214,16 @@ func mainMaster(p *Parallel) {
 			log.Fatalln("failed to dial slave:", err.Error())
 		}
 
-		transport = p.transportFactory.GetTransport(transport)
+		transport, err = p.transportFactory.GetTransport(transport)
+		if err != nil {
+			log.Fatalln("failed to open:", err.Error())
+		}
+
 		err = transport.Open()
 		if err != nil {
 			log.Fatalln("failed to open:", err.Error())
 		}
+
 		defer transport.Close()
 
 		slave.Client = parallel.NewParallelClientFactory(transport, p.protocolFactory)
