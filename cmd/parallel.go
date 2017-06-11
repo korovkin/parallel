@@ -88,7 +88,6 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	T_START := time.Now()
 	var err error
 	output := &parallel.Output{}
-
 	loggerOut := newLogger(ticket, true)
 	loggerErr := newLogger(ticket, true)
 
@@ -120,12 +119,14 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		}
 
 		defer transport.Close()
-		slave.Client = parallel.NewParallelClientFactory(transport, p.protocolFactory)
+		client := parallel.NewParallelClientFactory(transport, p.protocolFactory)
 
-		output, err = slave.Client.Execute(&parallel.Cmd{
+		cmd := parallel.Cmd{
 			CmdLine: cmdLine,
 			Ticket:  int64(ticket),
-		})
+		}
+
+		output, err = client.Execute(&cmd)
 		if err != nil {
 			log.Fatalln("failed to execute:", err.Error())
 		}
@@ -178,7 +179,6 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 
 type Slave struct {
 	Address string `json:"address"`
-	Client  *parallel.ParallelClient
 }
 
 type Parallel struct {
@@ -226,8 +226,8 @@ func mainMaster(p *Parallel) {
 
 		defer transport.Close()
 
-		slave.Client = parallel.NewParallelClientFactory(transport, p.protocolFactory)
-		ok, err := slave.Client.Ping()
+		client := parallel.NewParallelClientFactory(transport, p.protocolFactory)
+		ok, err := client.Ping()
 		if err != nil {
 			log.Fatalln("failed to ping client:", err.Error())
 		}
@@ -260,9 +260,12 @@ func NewParallelSlaveHandler() *ParallelSlaveHandler {
 }
 
 func (p *ParallelSlaveHandler) Execute(command *parallel.Cmd) (output *parallel.Output, err error) {
-	log.Println("ParallelSlaveHandler: Execute: ", command.CmdLine)
+	output = nil
+	err = nil
 	output, err = executeCommand(p.p, int(command.Ticket), command.CmdLine)
+
 	// TODO:: recover, handle panics
+
 	return output, err
 }
 
