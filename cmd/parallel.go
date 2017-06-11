@@ -404,14 +404,14 @@ func main() {
 	// stats:
 	p.StatNumCommandsStart = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "num_commands_start",
+			Name: "commands_num_start",
 			Help: "num received"})
 	err := prometheus.Register(p.StatNumCommandsStart)
 	CheckFatal(err)
 
 	p.StatNumCommandsDone = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "num_commands_done",
+			Name: "commands_num_done",
 			Help: "num received"})
 	err = prometheus.Register(p.StatNumCommandsDone)
 	CheckFatal(err)
