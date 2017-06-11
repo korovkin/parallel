@@ -58,7 +58,7 @@ func (l *logger) Write(p []byte) (int, error) {
 
 			loggerMutex.Lock()
 			ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-			fmt.Printf("[%16s %s %s %d] ", ts, l.hostname, now, l.ticket)
+			fmt.Printf("[%-14s %s %s %d] ", ts, l.hostname, now, l.ticket)
 			ct.ResetColor()
 
 			if l.buf != nil {
@@ -213,7 +213,7 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 }
 
 type Slave struct {
-	Address string `json:"address"`
+	Address string
 }
 
 type Parallel struct {
@@ -233,6 +233,7 @@ type Parallel struct {
 	serverTransport thrift.TServerTransport
 	slaveAddress    string
 
+	// stats:
 	StatNumCommandsStart prometheus.Counter
 	StatNumCommandsDone  prometheus.Counter
 	StatCommandLatency   prometheus.Summary
