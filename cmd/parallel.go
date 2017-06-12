@@ -67,15 +67,17 @@ func (l *logger) Write(p []byte) (int, error) {
 				e = "E"
 			}
 
-			if l.print {
+			{
 				loggerMutex.Lock()
-				ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-				fmt.Printf("[%-14s %s %s %03d %s] ", ts, l.hostname, now, l.ticket, e)
-				ct.ResetColor()
+				if l.print {
+					ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
+					fmt.Printf("[%-14s %s %s %03d %s] ", ts, l.hostname, now, l.ticket, e)
+					ct.ResetColor()
+					fmt.Print(s)
+				}
 				if l.buf != nil {
 					l.buf.Write([]byte(s))
 				}
-				fmt.Print(s)
 				loggerMutex.Unlock()
 			}
 
