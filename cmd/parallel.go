@@ -368,6 +368,20 @@ func mainSlave(p *Parallel) {
 	}
 }
 
+func metricsServer(serverAddress string) {
+	metricsHandler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})
+	http.HandleFunc("/metrics", func(c http.ResponseWriter, req *http.Request) {
+		metricsHandler.ServeHTTP(c, req)
+	})
+
+	http.HandleFunc("/",
+		func(c http.ResponseWriter, req *http.Request) {
+			io.WriteString(c, fmt.Sprintf("parallel %s", time.Now().String()))
+		})
+
+	go http.ListenAndServe(serverAddress, nil)
+}
+
 func main() {
 	T_START := time.Now()
 	logger := newLogger(0, false)
@@ -450,6 +464,9 @@ func main() {
 	err = prometheus.Register(p.StatCommandLatency)
 	CheckFatal(err)
 
+	// run the metrics server:
+	go metricsServer(*flag_slave_metrics_address)
+
 	if *flag_slave == false {
 		loggerHostname = p.slaveAddress
 		logger.hostname = loggerHostname
@@ -460,20 +477,10 @@ func main() {
 		loggerHostname = p.slaveAddress
 		logger.hostname = loggerHostname
 
-		// metrics
-		metricsHandler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})
-		http.HandleFunc("/metrics", func(c http.ResponseWriter, req *http.Request) {
-			metricsHandler.ServeHTTP(c, req)
-		})
-
-		http.HandleFunc("/",
-			func(c http.ResponseWriter, req *http.Request) {
-				io.WriteString(c, fmt.Sprintf("parallel %s", time.Now().String()))
-			})
-
-		go http.ListenAndServe(*flag_slave_metrics_address, nil)
-
 		fmt.Fprintf(logger, "running as slave on: %s\n", p.slaveAddress)
 		mainSlave(&p)
+
+		// stop the metrics thread as well:
+		os.Exit(0)
 	}
 }
