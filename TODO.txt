@@ -1,0 +1,4 @@
+==> 
+
+ + add `--key` to pina a key to a specific ticket
+ + add man page
