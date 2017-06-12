@@ -272,6 +272,7 @@ func (p *Parallel) Close() {
 
 func mainMaster(p *Parallel) {
 	var err error
+	log.SetFlags(log.Lmicroseconds | log.Ldate | log.Lshortfile)
 
 	// connect to slaves:
 	for _, slave := range p.Slaves {
@@ -368,7 +369,7 @@ func mainSlave(p *Parallel) {
 	}
 }
 
-func metricsServer(serverAddress string) {
+func metricsServer(p *Parallel, serverAddress string) {
 	metricsHandler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})
 	http.HandleFunc("/metrics", func(c http.ResponseWriter, req *http.Request) {
 		metricsHandler.ServeHTTP(c, req)
@@ -376,10 +377,20 @@ func metricsServer(serverAddress string) {
 
 	http.HandleFunc("/",
 		func(c http.ResponseWriter, req *http.Request) {
-			io.WriteString(c, fmt.Sprintf("parallel %s", time.Now().String()))
+			io.WriteString(c,
+				fmt.Sprintf(
+					"go parallel time: %d slave_address: %s jobs: %d slaves: %d",
+					time.Now().Unix(),
+					serverAddress,
+					p.jobs,
+					len(p.Slaves)),
+			)
 		})
 
-	go http.ListenAndServe(serverAddress, nil)
+	err := http.ListenAndServe(serverAddress, nil)
+	if err != nil {
+		log.Println("WARNING: failed to start the metrics server on:", serverAddress, err.Error)
+	}
 }
 
 func main() {
@@ -420,7 +431,7 @@ func main() {
 	fmt.Fprintf(logger, "concurrency limit: %d", *flag_jobs)
 	fmt.Fprintf(logger, "slaves: %s", *flag_slaves)
 
-	p := Parallel{}
+	p := &Parallel{}
 	p.jobs = *flag_jobs
 	p.logger = logger
 	p.worker = limiter.NewConcurrencyLimiter(p.jobs)
@@ -465,20 +476,20 @@ func main() {
 	CheckFatal(err)
 
 	// run the metrics server:
-	go metricsServer(*flag_slave_metrics_address)
+	go metricsServer(p, *flag_slave_metrics_address)
 
 	if *flag_slave == false {
 		loggerHostname = p.slaveAddress
 		logger.hostname = loggerHostname
 
 		fmt.Fprintf(logger, "running as master\n")
-		mainMaster(&p)
+		mainMaster(p)
 	} else {
 		loggerHostname = p.slaveAddress
 		logger.hostname = loggerHostname
 
 		fmt.Fprintf(logger, "running as slave on: %s\n", p.slaveAddress)
-		mainSlave(&p)
+		mainSlave(p)
 
 		// stop the metrics thread as well:
 		os.Exit(0)
