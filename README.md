@@ -9,11 +9,9 @@ inspired by https://www.gnu.org/software/parallel/
 [![Build Status](https://travis-ci.org/korovkin/parallel.svg)](https://travis-ci.org/korovkin/parallel)
 
 
-## install:
-
-executing the following will install the tool into: `$GOPATH/bin/parallel`
+## build:
 ```
-go get github.com:korovkin/parallel.git/...
+go build cmd/*.go
 ```
 
 ## compress/decompress 10 large files (serially):

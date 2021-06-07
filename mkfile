@@ -1,9 +1,8 @@
-
 travis:
-	go build cmd/parallel.go
+	go build -o parallel cmd/*.go
 
 build: thrift
-	go build
+	go build -o parallel cmd/*.go
 
 thrift:
 	thrift -r --gen go parallel.thrift
