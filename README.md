@@ -14,7 +14,15 @@ inspired by https://www.gnu.org/software/parallel/
 go build cmd/*.go
 ```
 
-## compress/decompress 10 large files (serially):
+or just:
+
+```
+make travis
+```
+
+## Demos:
+
+### compress/decompress 10 large files (serially):
 
 ```
  # ls -sh
@@ -33,7 +41,7 @@ user	0m0.755s
 sys	0m0.466s
 ```
 
-## compress/decompress 10 large files (concurrently with parallel):
+### compress/decompress 10 large files (concurrently with parallel):
 
 ```
 time for f in *.txt ; do echo gzip $f; done | $GOPATH/bin/parallel -j 10
@@ -94,5 +102,30 @@ time for f in *.txt.gz ; do echo gunzip $f; done | $GOPATH/bin/parallel -j 10
 real	0m1.312s
 user	0m0.954s
 sys	0m0.674s
+
+```
+
+
+### run concurrent jobs (pings)
+
+
+```
+echo -e " ping www.google.com\n ping apple.com\n \n\n" | ./parallel -j 10 -v
+
+[56.609µs        15:06:07 000 I] concurrency limit: 10
+[204.437µs       15:06:07 004 I] start: ''
+[231.207µs       15:06:07 001 I] start: 'ping apple.com'
+[269.186µs       15:06:07 002 I] start: ''
+[307.086µs       15:06:07 000 I] start: 'ping www.google.com'
+[400.384µs       15:06:07 003 I] start: ''
+[676.3µs         15:06:07 004 I] execute: done: dt: 478.343µs
+[749.079µs       15:06:07 002 I] execute: done: dt: 517.862µs
+[851.008µs       15:06:07 003 I] execute: done: dt: 508.883µs
+[29.482275ms     15:06:07 001 I] PING apple.com (17.253.144.10) 56(84) bytes of data.
+[29.496675ms     15:06:07 001 I] 64 bytes from icloud.com (17.253.144.10): icmp_seq=1 ttl=58 time=26.2 ms
+[99.010999ms     15:06:07 000 I] PING www.google.com(yx-in-x69.1e100.net (2607:f8b0:4002:c08::69)) 56 data bytes
+[99.028179ms     15:06:07 000 I] 64 bytes from yx-in-x69.1e100.net (2607:f8b0:4002:c08::69): icmp_seq=1 ttl=103 time=92.8 ms
+[1.027270463s    15:06:07 001 I] 64 bytes from icloud.com (17.253.144.10): icmp_seq=2 ttl=58 time=22.4 ms
+[1.100067039s    15:06:07 000 I] 64 bytes from yx-in-x69.1e100.net (2607:f8b0:4002:c08::69): icmp_seq=2 ttl=102 time=92.8 ms
 
 ```
