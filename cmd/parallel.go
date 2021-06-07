@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -15,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"git.apache.org/thrift.git/lib/go/thrift"
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/daviddengcn/go-colortext"
 	"github.com/korovkin/limiter"
 	"github.com/korovkin/parallel"
@@ -173,7 +174,7 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		loggerOut.hostname = slave.Address
 		fmt.Fprintf(loggerOut, "start: '"+cmdLine+"'\n")
 
-		output, err = client.Execute(&cmd)
+		output, err = client.Execute(context.Background(), &cmd)
 		if err != nil {
 			log.Fatalln("failed to execute:", err.Error())
 		}
@@ -295,7 +296,7 @@ func mainMaster(p *Parallel) {
 		defer transport.Close()
 
 		client := parallel.NewParallelClientFactory(transport, p.protocolFactory)
-		ok, err := client.Ping()
+		ok, err := client.Ping(context.Background())
 		if err != nil {
 			log.Fatalln("failed to ping client:", err.Error())
 		}
@@ -330,7 +331,7 @@ func NewParallelSlaveHandler() *ParallelSlaveHandler {
 	return &ParallelSlaveHandler{}
 }
 
-func (p *ParallelSlaveHandler) Execute(command *parallel.Cmd) (output *parallel.Output, err error) {
+func (p *ParallelSlaveHandler) Execute(context context.Context, command *parallel.Cmd) (output *parallel.Output, err error) {
 	output = nil
 	err = nil
 	output, err = executeCommand(p.p, int(command.Ticket), command.CmdLine)
@@ -340,7 +341,7 @@ func (p *ParallelSlaveHandler) Execute(command *parallel.Cmd) (output *parallel.
 	return output, err
 }
 
-func (p *ParallelSlaveHandler) Ping() (r string, err error) {
+func (p *ParallelSlaveHandler) Ping(context context.Context) (r string, err error) {
 	return "ping:ok", nil
 }
 
