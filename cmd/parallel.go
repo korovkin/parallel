@@ -41,7 +41,7 @@ var (
 
 	flag_verbose = flag.Bool(
 		"v",
-		false,
+		true,
 		"verbose level: 1")
 )
 
