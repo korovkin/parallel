@@ -1,0 +1,2 @@
+while [ yes ] ; do date; sleep 2; done
+while [ yes ] ; do date; sleep 4; done

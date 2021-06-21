@@ -199,7 +199,7 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 	}
 
 	// execute locally:
-	cs := []string{"/bin/sh", "-c", cmdLine}
+	cs := []string{"/bin/bash", "-c", cmdLine}
 	cmd := exec.Command(cs[0], cs[1:]...)
 	cmd.Stdin = nil
 	cmd.Stdout = loggerOut
