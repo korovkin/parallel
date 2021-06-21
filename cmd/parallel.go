@@ -26,11 +26,12 @@ import (
 )
 
 type logger struct {
-	ticket   int
-	hostname string
-	isError  bool
-	buf      *bytes.Buffer
-	print    bool
+	ticket     int
+	hostname   string
+	isError    bool
+	buf        *bytes.Buffer
+	print      bool
+	lineNumber int
 }
 
 var (
@@ -72,7 +73,7 @@ func (l *logger) Write(p []byte) (int, error) {
 				loggerMutex.Lock()
 				if l.print {
 					ct.ChangeColor(loggerColors[l.ticket%len(loggerColors)], false, ct.None, false)
-					fmt.Printf("[%-14s %s %s %03d %s] ", ts, l.hostname, now, l.ticket, e)
+					fmt.Printf("[l:%03d: %-14s %s %s %03d %s] ", l.lineNumber, ts, l.hostname, now, l.ticket, e)
 					ct.ResetColor()
 					fmt.Print(s)
 				}
@@ -121,15 +122,17 @@ func CheckNotFatal(e error) error {
 	return e
 }
 
-func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, error) {
+func executeCommand(p *Parallel, ticket int, cmdLine string, lineNumber int) (*parallel.Output, error) {
 	p.StatNumCommandsStart.Inc()
 	T_START := time.Now()
 	var err error
 	output := &parallel.Output{}
 	loggerOut := newLogger(ticket, true)
 	loggerOut.isError = false
+	loggerOut.lineNumber = lineNumber
 	loggerErr := newLogger(ticket, true)
 	loggerErr.isError = true
+	loggerErr.lineNumber = lineNumber
 
 	defer func() {
 		dt := time.Since(T_START)
@@ -209,10 +212,15 @@ func executeCommand(p *Parallel, ticket int, cmdLine string) (*parallel.Output, 
 		fmt.Sprintf("PARALLEL_TICKER=%d", ticket),
 	)
 
-	fmt.Fprintf(loggerOut, "start: '"+cmdLine+"'\n")
+	fmt.Fprintf(loggerOut, fmt.Sprintln(
+		"=> start",
+		"lineNumber:", lineNumber,
+		"cmd: ", cmdLine))
 
 	loggerOut.print = *flag_verbose
+	loggerOut.lineNumber = lineNumber
 	loggerErr.print = *flag_verbose
+	loggerErr.lineNumber = lineNumber
 
 	err = cmd.Start()
 	if err != nil {
@@ -310,6 +318,7 @@ func mainMaster(p *Parallel) {
 
 	r := bufio.NewReaderSize(os.Stdin, 1*1024*1024)
 	fmt.Fprintf(p.logger, "reading from stdin...\n")
+	lineNum := 0
 	for {
 		line, err := r.ReadString('\n')
 		if err == io.EOF {
@@ -317,9 +326,12 @@ func mainMaster(p *Parallel) {
 		}
 		line = strings.TrimSpace(line)
 
+		lineNumber := lineNum
 		p.worker.ExecuteWithTicket(func(ticket int) {
-			executeCommand(p, ticket, line)
+			executeCommand(p, ticket, line, lineNumber)
 		})
+
+		lineNum += 1
 	}
 }
 
@@ -334,7 +346,9 @@ func NewParallelSlaveHandler() *ParallelSlaveHandler {
 func (p *ParallelSlaveHandler) Execute(context context.Context, command *parallel.Cmd) (output *parallel.Output, err error) {
 	output = nil
 	err = nil
-	output, err = executeCommand(p.p, int(command.Ticket), command.CmdLine)
+
+	lineNumber := 0 // TODO:: hook this up to thrift
+	output, err = executeCommand(p.p, int(command.Ticket), command.CmdLine, lineNumber)
 
 	// TODO:: recover, handle panics
 
