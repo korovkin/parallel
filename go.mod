@@ -1,6 +1,6 @@
 module github.com/korovkin/parallel
 
-go 1.16
+go 1.18
 
 require (
 	github.com/apache/thrift v0.13.1-0.20191017214740-b75e88a33d67
